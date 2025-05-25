@@ -1,17 +1,25 @@
 require('dotenv').config(); // Load environment variables from .env file
 const express = require('express');
 const axios = require('axios');
+const cors = require('cors'); // CORS middleware
+
 const app = express();
 const port = 3000;
+
+// ✅ CORS ni faqat GET va POST uchun ruxsat beramiz
+app.use(cors({
+    origin: '*', // yoki 'http://localhost:5173' kabi frontend manzilingiz
+    methods: ['GET', 'POST']
+}));
 
 // Middleware to parse JSON request bodies
 app.use(express.json());
 
-// Your Gemini API Key
+// Gemini API sozlamalari
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
-// Route to handle Gemini API requests
+// POST: Gemini'dan matn generatsiya qilish
 app.post('/generate-content', async (req, res) => {
     const { prompt } = req.body;
 
@@ -23,37 +31,32 @@ app.post('/generate-content', async (req, res) => {
         const response = await axios.post(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
             contents: [
                 {
-                    parts: [
-                        {
-                            text: prompt
-                        }
-                    ]
+                    parts: [{ text: prompt }]
                 }
             ]
         }, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
+            headers: { 'Content-Type': 'application/json' }
         });
 
-        // Faqatgina asosiy matnni ajratib olish
-        const geminiText = response.data.candidates && response.data.candidates.length > 0
-            ? response.data.candidates[0].content.parts[0].text
-            : 'Javob topilmadi.';
-
-        // Faqat matnni javob sifatida yuborish
-        res.send(geminiText); // res.json o'rniga res.send() ishlatamiz, chunki faqat matn yuboryapmiz
+        const geminiText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Javob topilmadi.';
+        res.send(geminiText);
 
     } catch (error) {
-        console.error('Error calling Gemini API:', error.response ? error.response.data : error.message);
+        console.error('Error calling Gemini API:', error.response?.data || error.message);
         res.status(500).json({ 
             error: 'Failed to communicate with Gemini API', 
-            details: error.response ? error.response.data : error.message 
+            details: error.response?.data || error.message 
         });
     }
 });
-// Start the server
+
+// Oddiy GET yo‘li
+app.get('/', (req, res) => {
+    res.send('Salom, bu Gemini API server!');
+});
+
+// Serverni ishga tushirish
 app.listen(port, () => {
-    console.log(`Node.js server listening at http://localhost:${port}`);
-    console.log(`Access the Gemini API endpoint at http://localhost:${port}/generate-content`);
+    console.log(`🚀 Server ishlayapti: http://localhost:${port}`);
+    console.log(`👉 POST so‘rov yuborish: http://localhost:${port}/generate-content`);
 });
